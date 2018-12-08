@@ -25,6 +25,7 @@ class Frame(object):
 
     def __init__(self, chunk_number_in_frame):
         self.chunk_number_in_frame = chunk_number_in_frame
+        self.chunks = {}
 
     def __del__(self):
         del self.chunks
@@ -34,7 +35,7 @@ class Frame(object):
         return self.check_all_chunks_received()
 
     def check_all_chunks_received(self):
-        return self.chunk_number_in_frame == self.chunks
+        return self.chunk_number_in_frame == len(self.chunks)
 
     def get_data(self):
         data = b""
@@ -50,15 +51,15 @@ def process_packet(packet):
     frame_number = int(meta_data[0])
     chunk_number_in_frame = int(meta_data[1])
     chunk_number = int(meta_data[2])
-    chunk = packet[100:]  # last 1400 bytes is file chunk
+    chunk = packet[METADATA_SIZE:]  # last CHUNK_SIZE bytes is file chunk
     if frame_number in frames:
         is_all_chunks_received = frames[frame_number].add_chunk(chunk_number, chunk)
         if is_all_chunks_received:
             display_frame(frame_number)
     else:
-        newFrame = Frame(chunk_number_in_frame)
-        newFrame.add_chunk(chunk_number, chunk)
-        frames[frame_number] = newFrame
+        new_frame = Frame(chunk_number_in_frame)
+        new_frame.add_chunk(chunk_number, chunk)
+        frames[frame_number] = new_frame
 
 
 def display_frame(frame_number):
@@ -66,7 +67,9 @@ def display_frame(frame_number):
     global screen_dimensions
     global clock
     frame = frames[frame_number]
-    pixels = decompress(frame.get_data())
+    frame_data = frame.get_data()
+    #print(len(frame_data))
+    pixels = decompress(frame_data)
 
     # Create the Surface from raw pixels
     img = pygame.image.fromstring(pixels, screen_dimensions, 'RGB')
@@ -107,7 +110,7 @@ def start_image_listener():
                     print(e)
 
 
-def main(destination_ip='192.168.1.3'):
+def main(destination_ip='192.168.1.41'):
     global display_window
     global screen_dimensions
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

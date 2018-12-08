@@ -26,7 +26,7 @@ def getIP():
     return IP
 
 
-def retreive_screenshot(ip_address):
+def retrieve_screenshot(ip_address):
     socket_for_image_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     socket_for_image_send.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     global screen_dimensions
@@ -45,14 +45,16 @@ def retreive_screenshot(ip_address):
                 chunks = [frame[i:i + CHUNK_SIZE] for i in range(0, frame_size, CHUNK_SIZE)]
             else:
                 chunks = [frame]
-            for i in range(len(chunks)):
+            chunk_number_in_frame = len(chunks)
+            print("%d,%d" %(frame_number,chunk_number_in_frame))
+            for i in range(chunk_number_in_frame):
                 # Frame.number;chunk_number_in_frame;chunk_number
-                meta_data = bytes("%d;%d;%d;" % (frame_number, len(chunks), i), "utf-8")
+                meta_data = bytes("%d;%d;%d;" % (frame_number,chunk_number_in_frame , i), "utf-8")
                 padding_size = METADATA_SIZE - len(meta_data)
                 padding = padding_size * bytes("\0", "utf-8")
                 packet = meta_data + padding + chunks[i]
                 socket_for_image_send.sendto(packet, (ip_address, IMG_TRANSFER_PORT))
-            sleep(1)
+            sleep(0.1)
             frame_number += 1
 
 
@@ -71,7 +73,7 @@ def main():
                 screen_dimensions_info = '%d,%d' % screen_dimensions
                 conn.send(str.encode(screen_dimensions_info))
                 print('Client connected IP:', ip_address)
-                thread = Thread(target=retreive_screenshot, daemon=True, args=(ip_address[0],))
+                thread = Thread(target=retrieve_screenshot, daemon=True, args=(ip_address[0],))
                 thread.start()
         finally:
             s.close()
