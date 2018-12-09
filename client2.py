@@ -17,7 +17,7 @@ display_window = None
 clock = None
 frames = {}
 displayed_frame_number = -1
-
+destination_ip='192.168.1.36'
 
 class Frame(object):
     chunk_number_in_frame = 0
@@ -77,10 +77,23 @@ def display_frame(frame_number):
     # Display the picture
     display_window.blit(img, (0, 0))
     pygame.display.flip()
-    clock.tick(60)
+    clock.tick(10)
 
     # Remove frame
     frames.pop(frame_number, None)
+
+
+def send_stop_request():
+    # Inform server to stop it sending stream
+    global destination_ip
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.connect((destination_ip, SCREEN_SHARING_REQUEST_PORT))
+            s.send(str.encode("stop"))
+        except Exception as e:
+            print(e)
+        finally:
+            s.close()
 
 
 def start_image_listener():
@@ -90,7 +103,8 @@ def start_image_listener():
     global clock
 
     pygame.init()
-    display_window = pygame.display.set_mode((INITIAL_WIDTH, INITIAL_HEIGHT))
+    display_window = pygame.display.set_mode((INITIAL_WIDTH, INITIAL_HEIGHT), pygame.RESIZABLE)
+    pygame.display.iconify()
     clock = pygame.time.Clock()
     while True:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -99,9 +113,12 @@ def start_image_listener():
             while True:
                 try:
                     for event in pygame.event.get():
-                        if event.type == pygame.QUIT:
+                        if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                            send_stop_request()
                             return
-
+                        elif event.type == pygame.MOUSEBUTTONDOWN:
+                            if event.button == 1:  # left mouse button?
+                                print(pygame.mouse.get_pos())
                     packet = s.recv(PACKET_SIZE)
                     process_packet(packet)
                     # Thread(target=process_packet, daemon=True, args=(packet,)).start() #Shall be tested later
@@ -110,12 +127,14 @@ def start_image_listener():
                     print(e)
 
 
-def main(destination_ip='192.168.1.41'):
+def request_stream():
     global display_window
     global screen_dimensions
+    global destination_ip
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
             s.connect((destination_ip, SCREEN_SHARING_REQUEST_PORT))
+            s.send(str.encode("request"))
             dimension_message = s.recv(1024).decode()
             dimensions = [int(i) for i in dimension_message.split(",")]
             screen_dimensions = tuple(dimensions)
@@ -130,5 +149,5 @@ def main(destination_ip='192.168.1.41'):
 if __name__ == '__main__':
     imageReceiver = Thread(target=start_image_listener, daemon=True)
     imageReceiver.start()
-    main()
+    request_stream()
     imageReceiver.join()

@@ -1,5 +1,5 @@
 import socket
-from threading import Thread
+from threading import Thread, currentThread
 from zlib import compress
 from mss import mss
 from time import sleep
@@ -31,9 +31,10 @@ def retrieve_screenshot(ip_address):
     socket_for_image_send.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     global screen_dimensions
     frame_number = 0
+    t = currentThread()
     with mss() as sct:
         #print(sct.monitors)
-        while 'streaming':
+        while getattr(t, "is_run", True):
             # Capture the screen
             rect = {'top': 0, 'left': 0, 'width': screen_dimensions[0], 'height': screen_dimensions[1]}
             img = sct.grab(rect)
@@ -60,6 +61,7 @@ def retrieve_screenshot(ip_address):
 
 def main():
     global screen_dimensions
+    streaming_thread = None
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((getIP(), SCREEN_SHARING_REQUEST_PORT))
@@ -68,13 +70,18 @@ def main():
             print('Server started.')
             while True:
                 conn, ip_address = s.accept()
-                screen_info = mss().monitors[1]
-                screen_dimensions = (screen_info["width"], screen_info["height"])
-                screen_dimensions_info = '%d,%d' % screen_dimensions
-                conn.send(str.encode(screen_dimensions_info))
-                print('Client connected IP:', ip_address)
-                thread = Thread(target=retrieve_screenshot, daemon=True, args=(ip_address[0],))
-                thread.start()
+                message = conn.recv(1024).decode()
+                if message == "request":
+                    screen_info = mss().monitors[1]
+                    screen_dimensions = (screen_info["width"], screen_info["height"])
+                    screen_dimensions_info = '%d,%d' % screen_dimensions
+                    conn.send(str.encode(screen_dimensions_info))
+                    print('Client connected IP:', ip_address)
+                    streaming_thread = Thread(target=retrieve_screenshot, daemon=True, args=(ip_address[0],))
+                    streaming_thread.is_run = True
+                    streaming_thread.start()
+                elif message == "stop":
+                    streaming_thread.is_run = False
         finally:
             s.close()
 
