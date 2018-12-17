@@ -17,7 +17,7 @@ display_window = None
 clock = None
 frames = {}
 displayed_frame_number = -1
-destination_ip='192.168.1.107'
+destination_ip='192.168.1.112'
 
 class Frame(object):
     chunk_number_in_frame = 0

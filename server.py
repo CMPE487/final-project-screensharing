@@ -1,4 +1,5 @@
 import socket
+from PIL import ImageGrab,Image
 from threading import Thread, currentThread
 from zlib import compress
 from mss import mss
@@ -38,16 +39,18 @@ def retrieve_screenshot(ip_address):
             # Capture the screen
             rect = {'top': 0, 'left': 0, 'width': screen_dimensions[0], 'height': screen_dimensions[1]}
             img = sct.grab(rect)
+            pil_img = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
+            img = pil_img.resize((720,480),Image.ANTIALIAS)
             # Tweak the compression level here (0-9)
-            frame = compress(img.rgb, 9)
-
+            frame = compress(img.tobytes(), 9)
+            #print(frame)
             frame_size = len(frame)
             if CHUNK_SIZE < frame_size:
                 chunks = [frame[i:i + CHUNK_SIZE] for i in range(0, frame_size, CHUNK_SIZE)]
             else:
                 chunks = [frame]
             chunk_number_in_frame = len(chunks)
-            print("%d,%d" %(frame_number,chunk_number_in_frame))
+            #print("%d,%d" %(frame_number,chunk_number_in_frame))
             for i in range(chunk_number_in_frame):
                 # Frame.number;chunk_number_in_frame;chunk_number
                 meta_data = bytes("%d;%d;%d;" % (frame_number,chunk_number_in_frame , i), "utf-8")
@@ -55,7 +58,7 @@ def retrieve_screenshot(ip_address):
                 padding = padding_size * bytes("\0", "utf-8")
                 packet = meta_data + padding + chunks[i]
                 socket_for_image_send.sendto(packet, (ip_address, IMG_TRANSFER_PORT))
-            sleep(0.1)
+            #sleep(0.1)
             frame_number += 1
 
 
@@ -74,7 +77,9 @@ def main():
                 if message == "request":
                     screen_info = mss().monitors[1]
                     screen_dimensions = (screen_info["width"], screen_info["height"])
-                    screen_dimensions_info = '%d,%d' % screen_dimensions
+                    #screen_dimensions = (720, 480)
+                    screen_dimensions_info = '%d,%d' % (720,480)
+                    print(screen_dimensions_info)
                     conn.send(str.encode(screen_dimensions_info))
                     print('Client connected IP:', ip_address)
                     streaming_thread = Thread(target=retrieve_screenshot, daemon=True, args=(ip_address[0],))
