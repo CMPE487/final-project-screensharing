@@ -3,8 +3,8 @@ from zlib import decompress
 import pygame
 from threading import Thread
 
-INITIAL_WIDTH = 1280
-INITIAL_HEIGHT = 720
+INITIAL_WIDTH = 720
+INITIAL_HEIGHT = 480
 IMG_TRANSFER_PORT = 7344
 SCREEN_SHARING_REQUEST_PORT = 7345
 DISCOVERY_BROADCAST_PORT = 7346
@@ -42,7 +42,6 @@ class Frame(object):
         for i in range(self.chunk_number_in_frame):
             data += self.chunks[i]
         return data
-
 
 def process_packet(packet):
     global frames
