@@ -1,4 +1,4 @@
-import socket
+import socket, time
 from PIL import Image
 from threading import Thread, currentThread
 from zlib import compress
@@ -37,14 +37,15 @@ def retrieve_screenshot(ip_address):
         #print(sct.monitors)
         while getattr(t, "is_run", True):
             # Capture the screen
+            start = time.time()
             rect = {'top': 0, 'left': 0, 'width': screen_dimensions[0], 'height': screen_dimensions[1]}
             img = sct.grab(rect)
             pil_img = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
             img = pil_img.resize((720,480),Image.ANTIALIAS)
             # Tweak the compression level here (0-9)
             frame = compress(img.tobytes(), 9)
-            #print(frame)
             frame_size = len(frame)
+            print(frame_size/1024.0)
             if CHUNK_SIZE < frame_size:
                 chunks = [frame[i:i + CHUNK_SIZE] for i in range(0, frame_size, CHUNK_SIZE)]
             else:
@@ -58,7 +59,8 @@ def retrieve_screenshot(ip_address):
                 padding = padding_size * bytes("\0", "utf-8")
                 packet = meta_data + padding + chunks[i]
                 socket_for_image_send.sendto(packet, (ip_address, IMG_TRANSFER_PORT))
-            #sleep(0.1)
+            print(time.time()-start)
+            #sleep(0.03) #for the purpose of 30 fps
             frame_number += 1
 
 
