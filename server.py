@@ -1,5 +1,5 @@
 import socket
-from PIL import ImageGrab,Image
+from PIL import Image
 from threading import Thread, currentThread
 from zlib import compress
 from mss import mss
