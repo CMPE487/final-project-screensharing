@@ -20,7 +20,7 @@ def getIP():
         s.connect(('192.168.1.1', 1))
         IP = s.getsockname()[0]
     except:
-        print('Coulnt get ip from socket, localhost shall be used')
+        print('Could\'nt get ip from socket, localhost shall be used')
         IP = '127.0.0.1'
     finally:
         s.close()

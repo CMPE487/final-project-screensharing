@@ -111,13 +111,6 @@ def start_image_listener():
             s.bind(("", IMG_TRANSFER_PORT))
             while True:
                 try:
-                    for event in pygame.event.get():
-                        if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-                            send_stop_request()
-                            return
-                        elif event.type == pygame.MOUSEBUTTONDOWN:
-                            if event.button == 1:  # left mouse button?
-                                print(pygame.mouse.get_pos())
                     packet = s.recv(PACKET_SIZE)
                     process_packet(packet)
                     # Thread(target=process_packet, daemon=True, args=(packet,)).start() #Shall be tested later
