@@ -2,6 +2,7 @@ import socket
 from zlib import decompress
 import pygame
 from threading import Thread
+from time import sleep
 
 INITIAL_WIDTH = 720
 INITIAL_HEIGHT = 480
@@ -17,7 +18,11 @@ display_window = None
 clock = None
 frames = {}
 displayed_frame_number = -1
-destination_ip='192.168.1.112'
+client_IP = ''
+server_IP = '192.168.1.112'
+
+server_list = {}
+
 
 class Frame(object):
     chunk_number_in_frame = 0
@@ -43,6 +48,7 @@ class Frame(object):
             data += self.chunks[i]
         return data
 
+
 def process_packet(packet):
     global frames
     meta_data = packet[:METADATA_SIZE].decode("utf-8").split(";")
@@ -67,7 +73,7 @@ def display_frame(frame_number):
     global clock
     frame = frames[frame_number]
     frame_data = frame.get_data()
-    #print(len(frame_data))
+    # print(len(frame_data))
     pixels = decompress(frame_data)
 
     # Create the Surface from raw pixels
@@ -84,10 +90,10 @@ def display_frame(frame_number):
 
 def send_stop_request():
     # Inform server to stop it sending stream
-    global destination_ip
+    global server_IP
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            s.connect((destination_ip, SCREEN_SHARING_REQUEST_PORT))
+            s.connect((server_IP, SCREEN_SHARING_REQUEST_PORT))
             s.send(str.encode("stop"))
         except Exception as e:
             print(e)
@@ -119,13 +125,63 @@ def start_image_listener():
                     print(e)
 
 
-def request_stream():
+def get_IP():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('192.168.1.1', 1))
+        IP = s.getsockname()[0]
+    except:
+        print('Could\'nt get IP with the first way, plan B shall be used.')
+        IP = (([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")] or [
+            [(s.connect(("8.8.8.8", 53)), s.getsockname()[0], s.close()) for s in
+             [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) + ["no IP found"])[0]
+        print('Server IP is ' + IP)
+    finally:
+        s.close()
+    return IP
+
+
+def send_discovery_message(client_IP):
+    message = '0;{}'.format(client_IP)
+    # print(message)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.bind((client_IP, 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        s.sendto(str.encode(message), ('<broadcast>', DISCOVERY_BROADCAST_PORT))
+    return 0
+
+
+def get_discovery_message(acceptedSocket):
+    message = acceptedSocket.recv(1024).decode()
+    print(message)
+    acceptedSocket.close()
+    messageParsed = message.split(";", 2)
+    # print(messageParsed)
+    if messageParsed[0] == '1':
+        server_IP = messageParsed[1]
+        server_name = messageParsed[2]
+        if server_IP not in server_list:
+            server_list[server_IP] = server_name
+
+
+def start_discovery_response_message_listener(client_IP):
+    # Listens for TCP Response messages
+    while True:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((client_IP, DISCOVERY_BROADCAST_PORT))
+            s.listen()
+            while True:
+                acceptedSocket, address = s.accept()
+                Thread(target=get_discovery_message, daemon=True, args=(acceptedSocket,))
+
+
+def request_stream(server_IP):
     global display_window
     global screen_dimensions
-    global destination_ip
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            s.connect((destination_ip, SCREEN_SHARING_REQUEST_PORT))
+            s.connect((server_IP, SCREEN_SHARING_REQUEST_PORT))
             s.send(str.encode("request"))
             dimension_message = s.recv(1024).decode()
             dimensions = [int(i) for i in dimension_message.split(",")]
@@ -139,7 +195,16 @@ def request_stream():
 
 
 if __name__ == '__main__':
+    client_IP = get_IP()
+
+    # Discover server stage
+    Thread(target=start_discovery_response_message_listener(), daemon=True).start()
+    send_discovery_message(client_IP)
+
+    # Wait for responses
+    sleep(1)
+
     imageReceiver = Thread(target=start_image_listener, daemon=True)
     imageReceiver.start()
-    request_stream()
+    request_stream(server_IP)
     imageReceiver.join()
