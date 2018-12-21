@@ -18,10 +18,10 @@ display_window = None
 clock = None
 frames = {}
 displayed_frame_number = -1
-client_IP = ''
-server_IP = '192.168.1.112'
+client_ip = ''
+server_ip = '192.168.1.112'
 
-server_list = {}
+server_dict = {}
 
 
 class Frame(object):
@@ -90,10 +90,10 @@ def display_frame(frame_number):
 
 def send_stop_request():
     # Inform server to stop it sending stream
-    global server_IP
+    global server_ip
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            s.connect((server_IP, SCREEN_SHARING_REQUEST_PORT))
+            s.connect((server_ip, SCREEN_SHARING_REQUEST_PORT))
             s.send(str.encode("stop"))
         except Exception as e:
             print(e)
@@ -125,63 +125,67 @@ def start_image_listener():
                     print(e)
 
 
-def get_IP():
+def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect(('192.168.1.1', 1))
-        IP = s.getsockname()[0]
-    except:
-        print('Could\'nt get IP with the first way, plan B shall be used.')
-        IP = (([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")] or [
+        ip = s.getsockname()[0]
+    except Exception as e:
+        print(e)
+        print('Could\'nt get ip with the first way, plan B shall be used.')
+        ip = (([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")] or [
             [(s.connect(("8.8.8.8", 53)), s.getsockname()[0], s.close()) for s in
              [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) + ["no IP found"])[0]
-        print('Server IP is ' + IP)
+        print("Server IP is " + ip)
     finally:
         s.close()
-    return IP
+    return ip
 
 
-def send_discovery_message(client_IP):
-    message = '0;{}'.format(client_IP)
+def send_discovery_message():
+    global client_ip
+    message = '0;{}'.format(client_ip)
     # print(message)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.bind((client_IP, 0))
+        s.bind((client_ip, 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         s.sendto(str.encode(message), ('<broadcast>', DISCOVERY_BROADCAST_PORT))
     return 0
 
 
-def get_discovery_message(acceptedSocket):
-    message = acceptedSocket.recv(1024).decode()
+def get_discovery_message(accepted_socket):
+    message = accepted_socket.recv(1024).decode()
     print(message)
-    acceptedSocket.close()
-    messageParsed = message.split(";", 2)
+    accepted_socket.close()
+    message_parsed = message.split(";", 2)
     # print(messageParsed)
-    if messageParsed[0] == '1':
-        server_IP = messageParsed[1]
-        server_name = messageParsed[2]
-        if server_IP not in server_list:
-            server_list[server_IP] = server_name
+    if message_parsed[0] == '1':
+        discovered_server_ip = message_parsed[1]
+        discovered_server_name = message_parsed[2]
+        if discovered_server_ip not in server_dict:
+            server_dict[discovered_server_ip] = discovered_server_name
 
 
-def start_discovery_response_message_listener(client_IP):
+def start_discovery_response_message_listener():
     # Listens for TCP Response messages
+    global client_ip
     while True:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.bind((client_IP, DISCOVERY_BROADCAST_PORT))
-            s.listen()
+            s.bind((client_ip, DISCOVERY_BROADCAST_PORT))
+            s.listen(5)
             while True:
-                acceptedSocket, address = s.accept()
-                Thread(target=get_discovery_message, daemon=True, args=(acceptedSocket,))
+                accepted_socket, address = s.accept()
+                Thread(target=get_discovery_message, daemon=True, args=(accepted_socket,))
 
 
-def request_stream(server_IP):
+def request_stream():
+    global server_ip
     global display_window
     global screen_dimensions
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            s.connect((server_IP, SCREEN_SHARING_REQUEST_PORT))
+            s.connect((server_ip, SCREEN_SHARING_REQUEST_PORT))
             s.send(str.encode("request"))
             dimension_message = s.recv(1024).decode()
             dimensions = [int(i) for i in dimension_message.split(",")]
@@ -194,17 +198,49 @@ def request_stream(server_IP):
             s.close()
 
 
+def select_server():
+    global server_ip
+    number_of_servers = len(server_dict)
+    server_ip_list = []
+
+    if number_of_servers == 0:
+        print("No active server to list at the moment.")
+        sleep(3)
+        send_discovery_message()
+        sleep(2)
+        return select_server()
+    elif number_of_servers > 1:
+        print("This is the list of online servers:")
+        i = 0
+        for server, name in server_dict:
+            server_ip_list.append(server)
+            i += 1
+            print("%{} - {}({})".format(str(i), name, server))
+        server_id = input("Select a server to get screen stream by typing its assigned number: ")
+        while not server_id.isdigit() or not int(server_id) <= number_of_servers or not int(server_id) > 0:
+            server_id = input("Please enter a digit between 1 and %d! " % number_of_servers)
+            server_ip = server_ip_list[int(server_id) - 1]
+    else:  # Only 1 server case
+        for server, name in server_dict:
+            print("There is only 1 active server named {}({}), it is automatically selected.".format(server, name))
+            server_ip = server
+    print("Selected server is " + server_dict[server_ip] + "(%s)." % server_ip)
+    return True
+
+
 if __name__ == '__main__':
-    client_IP = get_IP()
+    client_ip = get_ip()
 
     # Discover server stage
     Thread(target=start_discovery_response_message_listener(), daemon=True).start()
-    send_discovery_message(client_IP)
+    send_discovery_message()
 
     # Wait for responses
     sleep(1)
 
+    select_server()
+
     imageReceiver = Thread(target=start_image_listener, daemon=True)
     imageReceiver.start()
-    request_stream(server_IP)
+    request_stream()
     imageReceiver.join()

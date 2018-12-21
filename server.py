@@ -1,9 +1,9 @@
-import socket, time
+import socket
 from PIL import Image
 from threading import Thread, currentThread
 from zlib import compress
 from mss import mss
-from time import sleep
+import time
 
 IMG_TRANSFER_PORT = 7344
 SCREEN_SHARING_REQUEST_PORT = 7345
@@ -14,22 +14,23 @@ METADATA_SIZE = PACKET_SIZE - CHUNK_SIZE
 screen_dimensions = (0, 0)
 
 server_name = ""
+server_key = ""
 
-
-def get_IP():
+def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect(('192.168.1.1', 1))
-        IP = s.getsockname()[0]
-    except:
+        ip = s.getsockname()[0]
+    except Exception as e:
+        print(e)
         print('Could\'nt get ip with the first way, plan B shall be used.')
-        IP = (([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")] or [
+        ip = (([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")] or [
             [(s.connect(("8.8.8.8", 53)), s.getsockname()[0], s.close()) for s in
              [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) + ["no IP found"])[0]
-        print("Server IP is " + IP)
+        print("Server IP is " + ip)
     finally:
         s.close()
-    return IP
+    return ip
 
 
 def retrieve_screenshot(address):
@@ -65,26 +66,28 @@ def retrieve_screenshot(address):
                 packet = meta_data + padding + chunks[i]
                 socket_for_image_send.sendto(packet, (address, IMG_TRANSFER_PORT))
             print(time.time() - start)
-            # sleep(0.03) #for the purpose of 30 fps
+            # time.sleep(0.03) #for the purpose of 30 fps
             frame_number += 1
 
 
-def respond_to_discovery_message(server_IP, client_IP):
+def respond_to_discovery_message(client_ip):
     global server_name
-    # Discovery response protocol ->  1;server_IP;server_name
-    response_message = ";".join(["1", server_IP, server_name])
+    global server_ip
+    # Discovery response protocol ->  1;server_ip;server_name
+    response_message = ";".join(["1", server_ip, server_name])
 
     # print("Discovery response message " +responseMessage)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(2)
-        s.connect((client_IP, DISCOVERY_BROADCAST_PORT))
+        s.connect((client_ip, DISCOVERY_BROADCAST_PORT))
         s.sendall(str.encode(response_message))
         s.close()
         print("Discovery response message " + response_message + " complete")
 
 
-def start_discovery_broadcast_listener(server_IP):
+def start_discovery_broadcast_listener():
     # Listens for UDP Broadcast messages
+    global server_ip
     while True:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -94,27 +97,29 @@ def start_discovery_broadcast_listener(server_IP):
                     message, address = s.recvfrom(1024)
 
                     message = message.decode()
-                    # Discovery protocol ->  0;client_IP
-                    messageParsed = message.split(";", 3)
-                    if messageParsed[1] == server_IP:
+                    # Discovery protocol ->  0;client_ip
+                    message_parsed = message.split(";", 3)
+                    if message_parsed[1] == server_ip:
                         # My own broadcast
                         continue
-                    if messageParsed[0] == '0':
-                        print(messageParsed)
-                        client_IP = messageParsed[1]
-                        respond_to_discovery_message(server_IP, client_IP)
-                except:
-                    print("Error during broadcast message receiving")
+                    if message_parsed[0] == '0':
+                        print(message_parsed)
+                        client_ip = message_parsed[1]
+                        respond_to_discovery_message(client_ip)
+                except Exception as e:
+                    print("Error during broadcast message receiving:")
+                    print(e)
 
 
-def startScreenRequestListener(server_IP):
+def start_screen_request_listener():
     global screen_dimensions
+    global server_ip
     streaming_thread = None
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind((server_IP, SCREEN_SHARING_REQUEST_PORT))
+        s.bind((server_ip, SCREEN_SHARING_REQUEST_PORT))
         try:
-            s.listen()
+            s.listen(5)
             print('Server started.')
             while True:
                 conn, address = s.accept()
@@ -137,7 +142,9 @@ def startScreenRequestListener(server_IP):
 
 
 if __name__ == '__main__':
-    server_IP = get_IP()
+    server_ip = get_ip()
     server_name = input('Hello, enter the server display name: ')
-    streaming_thread = Thread(target=start_discovery_broadcast_listener, daemon=True, args=(server_IP,)).start()
-    startScreenRequestListener(server_IP)
+    #server_key = input('Enter the server access key: ')
+    discovery_listener_thread = Thread(target=start_discovery_broadcast_listener, daemon=True,
+                                       args=(server_ip,)).start()
+    start_screen_request_listener()
