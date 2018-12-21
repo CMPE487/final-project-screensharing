@@ -220,7 +220,7 @@ def select_server():
         server_id = input("Select a server to get screen stream by typing its assigned number: ")
         while not server_id.isdigit() or not int(server_id) <= number_of_servers or not int(server_id) > 0:
             server_id = input("Please enter a digit between 1 and %d! " % number_of_servers)
-            server_ip = server_ip_list[int(server_id) - 1]
+        server_ip = server_ip_list[int(server_id) - 1]
     else:  # Only 1 server case
         for server, name in server_dict.items():
             print("There is only 1 active server named {}({}), it is automatically selected.".format(server, name))
