@@ -13,8 +13,11 @@ CHUNK_SIZE = 1450
 METADATA_SIZE = PACKET_SIZE - CHUNK_SIZE
 screen_dimensions = (0, 0)
 
+streaming_thread = None
+clients = []
 server_name = ""
 server_key = ""
+
 
 def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -33,7 +36,7 @@ def get_ip():
     return ip
 
 
-def retrieve_screenshot(address):
+def retrieve_screenshot():
     socket_for_image_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     socket_for_image_send.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     global screen_dimensions
@@ -64,7 +67,8 @@ def retrieve_screenshot(address):
                 padding_size = METADATA_SIZE - len(meta_data)
                 padding = padding_size * bytes("\0", "utf-8")
                 packet = meta_data + padding + chunks[i]
-                socket_for_image_send.sendto(packet, (address, IMG_TRANSFER_PORT))
+                for client_ip in clients:
+                    socket_for_image_send.sendto(packet, (client_ip, IMG_TRANSFER_PORT))
             print(time.time() - start)
             # time.sleep(0.03) #for the purpose of 30 fps
             frame_number += 1
@@ -82,7 +86,7 @@ def respond_to_discovery_message(client_ip):
         s.connect((client_ip, DISCOVERY_BROADCAST_PORT))
         s.sendall(str.encode(response_message))
         s.close()
-        print("Discovery response message " + response_message + " complete")
+        #print("Discovery response message " + response_message + " complete")
 
 
 def start_discovery_broadcast_listener():
@@ -103,7 +107,7 @@ def start_discovery_broadcast_listener():
                         # My own broadcast
                         continue
                     if message_parsed[0] == '0':
-                        print(message_parsed)
+                        #print(message_parsed)
                         client_ip = message_parsed[1]
                         respond_to_discovery_message(client_ip)
                 except Exception as e:
@@ -114,7 +118,7 @@ def start_discovery_broadcast_listener():
 def start_screen_request_listener():
     global screen_dimensions
     global server_ip
-    streaming_thread = None
+    global streaming_thread
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((server_ip, SCREEN_SHARING_REQUEST_PORT))
@@ -124,6 +128,7 @@ def start_screen_request_listener():
             while True:
                 conn, address = s.accept()
                 message = conn.recv(1024).decode()
+                sender_ip = address[0]
                 if message == "request":
                     screen_info = mss().monitors[1]
                     screen_dimensions = (screen_info["width"], screen_info["height"])
@@ -131,12 +136,19 @@ def start_screen_request_listener():
                     screen_dimensions_info = '%d,%d' % (720, 480)
                     print(screen_dimensions_info)
                     conn.send(str.encode(screen_dimensions_info))
-                    print('Client connected IP:', address)
-                    streaming_thread = Thread(target=retrieve_screenshot, daemon=True, args=(address[0],))
-                    streaming_thread.is_running = True
-                    streaming_thread.start()
+                    print('Client connected with address:', address)
+                    if sender_ip not in clients:
+                        clients.append(sender_ip)
+                    if not streaming_thread:
+                        streaming_thread = Thread(target=retrieve_screenshot, daemon=True)
+                        streaming_thread.is_running = True
+                        streaming_thread.start()
                 elif message == "stop":
-                    streaming_thread.is_running = False
+                    if sender_ip in clients:
+                        clients.remove(sender_ip)
+                    if not clients and streaming_thread:
+                        streaming_thread.is_running = False
+                        streaming_thread = None
         finally:
             s.close()
 
@@ -144,6 +156,6 @@ def start_screen_request_listener():
 if __name__ == '__main__':
     server_ip = get_ip()
     server_name = input('Hello, enter the server display name: ')
-    #server_key = input('Enter the server access key: ')
+    # server_key = input('Enter the server access key: ')
     discovery_listener_thread = Thread(target=start_discovery_broadcast_listener, daemon=True).start()
     start_screen_request_listener()

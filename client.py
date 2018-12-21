@@ -97,8 +97,6 @@ def send_stop_request():
             s.send(str.encode("stop"))
         except Exception as e:
             print(e)
-        finally:
-            s.close()
 
 
 def start_image_listener():
@@ -158,7 +156,7 @@ def send_discovery_message():
 
 def get_discovery_message(accepted_socket):
     message = accepted_socket.recv(1024).decode()
-    print(message)
+    #print(message)
     accepted_socket.close()
     message_parsed = message.split(";", 2)
     # print(messageParsed)
@@ -218,7 +216,7 @@ def select_server():
         for server, name in server_dict.items():
             server_ip_list.append(server)
             i += 1
-            print("%{} - {}({})".format(str(i), name, server))
+            print("{} - {}({})".format(str(i), name, server))
         server_id = input("Select a server to get screen stream by typing its assigned number: ")
         while not server_id.isdigit() or not int(server_id) <= number_of_servers or not int(server_id) > 0:
             server_id = input("Please enter a digit between 1 and %d! " % number_of_servers)
@@ -239,7 +237,7 @@ if __name__ == '__main__':
     send_discovery_message()
 
     # Wait for responses
-    sleep(1)
+    sleep(2)
 
     select_server()
 
