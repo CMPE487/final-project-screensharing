@@ -15,7 +15,7 @@ CHUNK_SIZE = 1450
 METADATA_SIZE = PACKET_SIZE - CHUNK_SIZE
 
 screen_dimensions = (0, 0)
-current_window_size = (INITIAL_WIDTH,INITIAL_HEIGHT)
+current_window_size = (INITIAL_WIDTH, INITIAL_HEIGHT)
 display_window = None
 clock = None
 frames = {}
@@ -109,9 +109,7 @@ def start_image_listener():
     global clock
     global current_window_size
     global is_full_screen
-    num_succeeded, num_failed = pygame.init()
-    #print("num_succeeded: %d" %num_succeeded)
-    #print("num_failed: %d" % num_failed)
+    pygame.init()
     display_window = pygame.display.set_mode((INITIAL_WIDTH, INITIAL_HEIGHT), pygame.RESIZABLE)
     clock = pygame.time.Clock()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -127,7 +125,7 @@ def start_image_listener():
                         current_window_size = event.size
                         display_window = pygame.display.set_mode(current_window_size, pygame.RESIZABLE)
                     elif event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
-                        current_window_size =(display_window.get_width(),display_window.get_height())
+                        current_window_size = (display_window.get_width(), display_window.get_height())
                         display_window = pygame.display.set_mode(current_window_size, pygame.RESIZABLE)
                     elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
                         if not is_full_screen:
@@ -136,9 +134,9 @@ def start_image_listener():
                         else:
                             is_full_screen = False
                             display_window = pygame.display.set_mode(current_window_size, pygame.RESIZABLE)
-                        #modes = pygame.display.list_modes(32)
-                        #print(modes)
-                        #display_window = pygame.display.set_mode(modes[0], pygame.FULLSCREEN, 32)
+                        # modes = pygame.display.list_modes(32)
+                        # print(modes)
+                        # display_window = pygame.display.set_mode(modes[0], pygame.FULLSCREEN, 32)
 
                 packet = s.recv(PACKET_SIZE)
                 process_packet(packet)
@@ -178,7 +176,7 @@ def send_discovery_message():
 
 def get_discovery_message(accepted_socket):
     message = accepted_socket.recv(1024).decode()
-    #print(message)
+    # print(message)
     accepted_socket.close()
     message_parsed = message.split(";", 2)
     # print(messageParsed)
@@ -215,7 +213,7 @@ def request_stream():
             dimensions = [int(i) for i in dimension_message.split(",")]
             screen_dimensions = tuple(dimensions)
             display_window = pygame.display.set_mode(screen_dimensions, pygame.RESIZABLE)
-            # display_window = pygame.display.set_caption(server_dict[server_ip] + "(%s)." % server_ip)
+            pygame.display.set_caption(server_dict[server_ip] + "(%s)" % server_ip)
         except Exception as e:
             print(e)
         finally:

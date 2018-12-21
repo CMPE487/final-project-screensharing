@@ -13,6 +13,7 @@ CHUNK_SIZE = 1450
 METADATA_SIZE = PACKET_SIZE - CHUNK_SIZE
 screen_dimensions = (0, 0)
 screen_dimensions_info = (1280, 720)
+screen_dimensions_info = (720, 480)
 streaming_thread = None
 clients = []
 server_name = ""
@@ -43,12 +44,12 @@ def retrieve_screenshot():
     global screen_dimensions_info
     frame_number = 0
     t = currentThread()
+    rect = {'top': 0, 'left': 0, 'width': screen_dimensions[0], 'height': screen_dimensions[1]}
     with mss() as sct:
         # print(sct.monitors)
         while getattr(t, "is_running", True):
             # Capture the screen
             start = time.time()
-            rect = {'top': 0, 'left': 0, 'width': screen_dimensions[0], 'height': screen_dimensions[1]}
             img = sct.grab(rect)
             pil_img = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
             img = pil_img.resize(screen_dimensions_info, Image.ANTIALIAS)
@@ -87,7 +88,7 @@ def respond_to_discovery_message(client_ip):
         s.connect((client_ip, DISCOVERY_BROADCAST_PORT))
         s.sendall(str.encode(response_message))
         s.close()
-        #print("Discovery response message " + response_message + " complete")
+        # print("Discovery response message " + response_message + " complete")
 
 
 def start_discovery_broadcast_listener():
@@ -104,11 +105,8 @@ def start_discovery_broadcast_listener():
                     message = message.decode()
                     # Discovery protocol ->  0;client_ip
                     message_parsed = message.split(";", 3)
-                    if message_parsed[1] == server_ip:
-                        # My own broadcast
-                        continue
                     if message_parsed[0] == '0':
-                        #print(message_parsed)
+                        # print(message_parsed)
                         client_ip = message_parsed[1]
                         respond_to_discovery_message(client_ip)
                 except Exception as e:
@@ -135,7 +133,7 @@ def start_screen_request_listener():
                     screen_info = mss().monitors[1]
                     screen_dimensions = (screen_info["width"], screen_info["height"])
                     print(screen_dimensions_info)
-                    conn.send(str.encode( '%d,%d' % screen_dimensions_info))
+                    conn.send(str.encode('%d,%d' % screen_dimensions_info))
                     print('Client connected with address:', address)
                     if sender_ip not in clients:
                         clients.append(sender_ip)
