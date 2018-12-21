@@ -22,7 +22,7 @@ frames = {}
 displayed_frame_number = -1
 client_ip = ''
 server_ip = '192.168.1.112'
-
+is_full_screen = False
 server_dict = {}
 
 
@@ -95,6 +95,7 @@ def send_stop_request():
     global server_ip
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
+            s.settimeout(2)
             s.connect((server_ip, SCREEN_SHARING_REQUEST_PORT))
             s.send(str.encode("stop"))
         except Exception as e:
@@ -107,10 +108,11 @@ def start_image_listener():
     global display_window
     global clock
     global current_window_size
-
-    pygame.init()
+    global is_full_screen
+    num_succeeded, num_failed = pygame.init()
+    #print("num_succeeded: %d" %num_succeeded)
+    #print("num_failed: %d" % num_failed)
     display_window = pygame.display.set_mode((INITIAL_WIDTH, INITIAL_HEIGHT), pygame.RESIZABLE)
-    pygame.display.iconify()
     clock = pygame.time.Clock()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -121,8 +123,23 @@ def start_image_listener():
                     if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                         send_stop_request()
                         return
-                    elif event.type == VIDEORESIZE:
+                    elif event.type == VIDEORESIZE and not is_full_screen:
                         current_window_size = event.size
+                        display_window = pygame.display.set_mode(current_window_size, pygame.RESIZABLE)
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
+                        current_window_size =(display_window.get_width(),display_window.get_height())
+                        display_window = pygame.display.set_mode(current_window_size, pygame.RESIZABLE)
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                        if not is_full_screen:
+                            is_full_screen = True
+                            display_window = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                        else:
+                            is_full_screen = False
+                            display_window = pygame.display.set_mode(current_window_size, pygame.RESIZABLE)
+                        #modes = pygame.display.list_modes(32)
+                        #print(modes)
+                        #display_window = pygame.display.set_mode(modes[0], pygame.FULLSCREEN, 32)
+
                 packet = s.recv(PACKET_SIZE)
                 process_packet(packet)
                 # Thread(target=process_packet, daemon=True, args=(packet,)).start() #Shall be tested later
@@ -191,14 +208,14 @@ def request_stream():
     global screen_dimensions
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
+            s.settimeout(2)
             s.connect((server_ip, SCREEN_SHARING_REQUEST_PORT))
             s.send(str.encode("request"))
             dimension_message = s.recv(1024).decode()
             dimensions = [int(i) for i in dimension_message.split(",")]
             screen_dimensions = tuple(dimensions)
-
             display_window = pygame.display.set_mode(screen_dimensions, pygame.RESIZABLE)
-            #display_window.scale(screen_dimensions)
+            # display_window = pygame.display.set_caption(server_dict[server_ip] + "(%s)." % server_ip)
         except Exception as e:
             print(e)
         finally:
