@@ -12,7 +12,7 @@ PACKET_SIZE = 1500
 CHUNK_SIZE = 1450
 METADATA_SIZE = PACKET_SIZE - CHUNK_SIZE
 screen_dimensions = (0, 0)
-
+screen_dimensions_info = (1280, 720)
 streaming_thread = None
 clients = []
 server_name = ""
@@ -40,6 +40,7 @@ def retrieve_screenshot():
     socket_for_image_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     socket_for_image_send.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     global screen_dimensions
+    global screen_dimensions_info
     frame_number = 0
     t = currentThread()
     with mss() as sct:
@@ -50,7 +51,7 @@ def retrieve_screenshot():
             rect = {'top': 0, 'left': 0, 'width': screen_dimensions[0], 'height': screen_dimensions[1]}
             img = sct.grab(rect)
             pil_img = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
-            img = pil_img.resize((720, 480), Image.ANTIALIAS)
+            img = pil_img.resize(screen_dimensions_info, Image.ANTIALIAS)
             # Tweak the compression level here (0-9)
             frame = compress(img.tobytes(), 9)
             frame_size = len(frame)
@@ -117,6 +118,7 @@ def start_discovery_broadcast_listener():
 
 def start_screen_request_listener():
     global screen_dimensions
+    global screen_dimensions_info
     global server_ip
     global streaming_thread
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -132,10 +134,8 @@ def start_screen_request_listener():
                 if message == "request":
                     screen_info = mss().monitors[1]
                     screen_dimensions = (screen_info["width"], screen_info["height"])
-                    # screen_dimensions = (720, 480)
-                    screen_dimensions_info = '%d,%d' % (720, 480)
                     print(screen_dimensions_info)
-                    conn.send(str.encode(screen_dimensions_info))
+                    conn.send(str.encode( '%d,%d' % screen_dimensions_info))
                     print('Client connected with address:', address)
                     if sender_ip not in clients:
                         clients.append(sender_ip)

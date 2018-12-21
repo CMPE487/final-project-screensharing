@@ -1,6 +1,7 @@
 import socket
 from zlib import decompress
 import pygame
+from pygame.locals import VIDEORESIZE
 from threading import Thread
 from time import sleep
 
@@ -14,6 +15,7 @@ CHUNK_SIZE = 1450
 METADATA_SIZE = PACKET_SIZE - CHUNK_SIZE
 
 screen_dimensions = (0, 0)
+current_window_size = (INITIAL_WIDTH,INITIAL_HEIGHT)
 display_window = None
 clock = None
 frames = {}
@@ -78,7 +80,7 @@ def display_frame(frame_number):
 
     # Create the Surface from raw pixels
     img = pygame.image.fromstring(pixels, screen_dimensions, 'RGB')
-
+    img = pygame.transform.scale(img, current_window_size)
     # Display the picture
     display_window.blit(img, (0, 0))
     pygame.display.flip()
@@ -104,6 +106,7 @@ def start_image_listener():
     global screen_dimensions
     global display_window
     global clock
+    global current_window_size
 
     pygame.init()
     display_window = pygame.display.set_mode((INITIAL_WIDTH, INITIAL_HEIGHT), pygame.RESIZABLE)
@@ -118,6 +121,8 @@ def start_image_listener():
                     if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                         send_stop_request()
                         return
+                    elif event.type == VIDEORESIZE:
+                        current_window_size = event.size
                 packet = s.recv(PACKET_SIZE)
                 process_packet(packet)
                 # Thread(target=process_packet, daemon=True, args=(packet,)).start() #Shall be tested later
@@ -192,7 +197,8 @@ def request_stream():
             dimensions = [int(i) for i in dimension_message.split(",")]
             screen_dimensions = tuple(dimensions)
 
-            display_window = pygame.display.set_mode(screen_dimensions)
+            display_window = pygame.display.set_mode(screen_dimensions, pygame.RESIZABLE)
+            #display_window.scale(screen_dimensions)
         except Exception as e:
             print(e)
         finally:
