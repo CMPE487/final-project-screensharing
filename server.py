@@ -136,7 +136,7 @@ def start_screen_request_listener():
                     streaming_thread.is_running = True
                     streaming_thread.start()
                 elif message == "stop":
-                    streaming_thread.is_run = False
+                    streaming_thread.is_running = False
         finally:
             s.close()
 
@@ -145,6 +145,5 @@ if __name__ == '__main__':
     server_ip = get_ip()
     server_name = input('Hello, enter the server display name: ')
     #server_key = input('Enter the server access key: ')
-    discovery_listener_thread = Thread(target=start_discovery_broadcast_listener, daemon=True,
-                                       args=(server_ip,)).start()
+    discovery_listener_thread = Thread(target=start_discovery_broadcast_listener, daemon=True).start()
     start_screen_request_listener()

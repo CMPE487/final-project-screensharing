@@ -111,18 +111,21 @@ def start_image_listener():
     display_window = pygame.display.set_mode((INITIAL_WIDTH, INITIAL_HEIGHT), pygame.RESIZABLE)
     pygame.display.iconify()
     clock = pygame.time.Clock()
-    while True:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.bind(("", IMG_TRANSFER_PORT))
-            while True:
-                try:
-                    packet = s.recv(PACKET_SIZE)
-                    process_packet(packet)
-                    # Thread(target=process_packet, daemon=True, args=(packet,)).start() #Shall be tested later
-                except Exception as e:
-                    print("Error during image receiving:")
-                    print(e)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind(("", IMG_TRANSFER_PORT))
+        while True:
+            try:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                        send_stop_request()
+                        return
+                packet = s.recv(PACKET_SIZE)
+                process_packet(packet)
+                # Thread(target=process_packet, daemon=True, args=(packet,)).start() #Shall be tested later
+            except Exception as e:
+                print("Error during image receiving:")
+                print(e)
 
 
 def get_ip():
@@ -176,7 +179,7 @@ def start_discovery_response_message_listener():
             s.listen(5)
             while True:
                 accepted_socket, address = s.accept()
-                Thread(target=get_discovery_message, daemon=True, args=(accepted_socket,))
+                Thread(target=get_discovery_message, daemon=True, args=(accepted_socket,)).start()
 
 
 def request_stream():
@@ -212,7 +215,7 @@ def select_server():
     elif number_of_servers > 1:
         print("This is the list of online servers:")
         i = 0
-        for server, name in server_dict:
+        for server, name in server_dict.items():
             server_ip_list.append(server)
             i += 1
             print("%{} - {}({})".format(str(i), name, server))
@@ -221,7 +224,7 @@ def select_server():
             server_id = input("Please enter a digit between 1 and %d! " % number_of_servers)
             server_ip = server_ip_list[int(server_id) - 1]
     else:  # Only 1 server case
-        for server, name in server_dict:
+        for server, name in server_dict.items():
             print("There is only 1 active server named {}({}), it is automatically selected.".format(server, name))
             server_ip = server
     print("Selected server is " + server_dict[server_ip] + "(%s)." % server_ip)
@@ -232,7 +235,7 @@ if __name__ == '__main__':
     client_ip = get_ip()
 
     # Discover server stage
-    Thread(target=start_discovery_response_message_listener(), daemon=True).start()
+    Thread(target=start_discovery_response_message_listener, daemon=True).start()
     send_discovery_message()
 
     # Wait for responses
@@ -244,3 +247,4 @@ if __name__ == '__main__':
     imageReceiver.start()
     request_stream()
     imageReceiver.join()
+    print("Bye")
