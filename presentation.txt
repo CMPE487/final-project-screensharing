@@ -1,0 +1,13 @@
+1- CMPE487 Final Project, Screen Sharing, Enes Kosar Onur Kalinagac
+2- Introduction
+    The reason why we have chosen this project is that we can combine couple of principles for one project.
+    We have used, UDP, zeroconf, file transfer protocols within the project.
+3- Project Plan
+    Checklist of what we have done and when we have done.
+4- Obstacles
+    The main problem of the project was getting the screenshot. We have tried to use the PILLOW library but it was so slow and then switched to mss.
+    The second thing is throughput of the network. We have decreased the resolution of the picture and sent it. This provided us x2 FPS.
+5- Flow of the program
+    Firstly, server is starting and waiting for a client(s).
+    To create a video we have taken screenshots continuously. The reason why we have used UDP is we don't need the whole data. Missing frames are trivial.
+    In client we are opening a window with pygame library and drawing each screenshot continuously. 
