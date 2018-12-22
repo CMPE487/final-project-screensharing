@@ -114,6 +114,7 @@ def start_image_listener():
     clock = pygame.time.Clock()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.settimeout(5)
         s.bind(("", IMG_TRANSFER_PORT))
         while True:
             try:
@@ -137,8 +138,12 @@ def start_image_listener():
                         # modes = pygame.display.list_modes(32)
                         # print(modes)
                         # display_window = pygame.display.set_mode(modes[0], pygame.FULLSCREEN, 32)
-
-                packet = s.recv(PACKET_SIZE)
+                try:
+                    packet = s.recv(PACKET_SIZE)
+                except socket.timeout:
+                    print("Didn't received data in the last 5 seconds!")
+                    print("Exiting...")
+                    return
                 process_packet(packet)
                 # Thread(target=process_packet, daemon=True, args=(packet,)).start() #Shall be tested later
             except Exception as e:
@@ -216,8 +221,6 @@ def request_stream():
             pygame.display.set_caption(server_dict[server_ip] + "(%s)" % server_ip)
         except Exception as e:
             print(e)
-        finally:
-            s.close()
 
 
 def select_server():
@@ -249,7 +252,6 @@ def select_server():
     print("Selected server is " + server_dict[server_ip] + "(%s)." % server_ip)
     return True
 
-
 if __name__ == '__main__':
     client_ip = get_ip()
 
@@ -261,7 +263,6 @@ if __name__ == '__main__':
     sleep(2)
 
     select_server()
-
     imageReceiver = Thread(target=start_image_listener, daemon=True)
     imageReceiver.start()
     request_stream()
