@@ -2,9 +2,10 @@ import socket
 from zlib import decompress
 import pygame
 from pygame.locals import VIDEORESIZE
-from threading import Thread
+from threading import Thread, currentThread, Lock
 from time import sleep
 import time
+
 INITIAL_WIDTH = 720
 INITIAL_HEIGHT = 480
 IMG_TRANSFER_PORT = 7344
@@ -24,6 +25,8 @@ client_ip = ''
 server_ip = '192.168.1.112'
 is_full_screen = False
 server_dict = {}
+frame_number_received = None
+display_mutex = None
 
 
 class Frame(object):
@@ -53,6 +56,8 @@ class Frame(object):
 
 def process_packet(packet):
     global frames
+    global frame_number_received
+    global display_mutex
     meta_data = packet[:METADATA_SIZE].decode("utf-8").split(";")
     # Frame.number;chunk_number_in_frame;chunk_number
     frame_number = int(meta_data[0])
@@ -62,37 +67,49 @@ def process_packet(packet):
     if frame_number in frames:
         is_all_chunks_received = frames[frame_number].add_chunk(chunk_number, chunk)
         if is_all_chunks_received:
-            Thread(target=display_frame, daemon=True, args=(frame_number,)).start()
+            frame_number_received = frame_number
+            try:
+                display_mutex.release()
+            except Exception as e:
+                print(e)  # already released
     else:
         new_frame = Frame(chunk_number_in_frame)
         new_frame.add_chunk(chunk_number, chunk)
         frames[frame_number] = new_frame
 
 
-def display_frame(frame_number):
-
+def display_frame():
     global frames
     global screen_dimensions
     global clock
-    frame = frames[frame_number]
-    frame_data = frame.get_data()
-    # print(len(frame_data))
-    pixels = decompress(frame_data)
+    global display_mutex
+    global frame_number_received
+    t = currentThread()
+    while getattr(t, "is_running", True):
+        display_mutex.acquire()
+        try:
+            frame_to_be_displayed = frame_number_received
+            frame = frames[frame_to_be_displayed]
+            frame_data = frame.get_data()
+            # print(len(frame_data))
+            pixels = decompress(frame_data)
 
-    # Create the Surface from raw pixels
-    img = pygame.image.fromstring(pixels, screen_dimensions, 'RGB')
-    img = pygame.transform.scale(img, current_window_size)
+            # Create the Surface from raw pixels
+            img = pygame.image.fromstring(pixels, screen_dimensions, 'RGB')
+            img = pygame.transform.scale(img, current_window_size)
 
-    # Display the picture
+            # Display the picture
 
-    display_window.blit(img, (0, 0))
-    pygame.display.flip()
-    start = time.time()
-    clock.tick(5)
+            display_window.blit(img, (0, 0))
+            pygame.display.flip()
+            # start = time.time()
+            clock.tick(12)
 
-    print(time.time() - start)
-    # Remove frame
-    frames.pop(frame_number, None)
+            # print(time.time() - start)
+            # Remove frame
+            frames.pop(frame_to_be_displayed, None)
+        except Exception as e:
+            print(e)
 
 
 def send_stop_request():
@@ -114,6 +131,11 @@ def start_image_listener():
     global clock
     global current_window_size
     global is_full_screen
+    global display_mutex
+    display_mutex = Lock()
+    display_mutex.acquire()
+    display_frame_thread = Thread(target=display_frame, daemon=True)
+    display_frame_thread.start()
     pygame.init()
     display_window = pygame.display.set_mode((INITIAL_WIDTH, INITIAL_HEIGHT), pygame.RESIZABLE)
     clock = pygame.time.Clock()
@@ -125,6 +147,7 @@ def start_image_listener():
             try:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                        display_frame_thread.is_running = False
                         send_stop_request()
                         return
                     elif event.type == VIDEORESIZE and not is_full_screen:
@@ -136,7 +159,9 @@ def start_image_listener():
                     elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
                         if not is_full_screen:
                             is_full_screen = True
-                            display_window = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                            display_window = pygame.display.set_mode((0, 0),
+                                                                     pygame.FULLSCREEN | pygame.DOUBLEBUF |
+                                                                     pygame.HWSURFACE)
                         else:
                             is_full_screen = False
                             display_window = pygame.display.set_mode(current_window_size, pygame.RESIZABLE)
@@ -145,6 +170,7 @@ def start_image_listener():
                 except socket.timeout:
                     print("Didn't received data in the last 5 seconds!")
                     print("Exiting...")
+                    display_frame_thread.is_running = False
                     return
                 process_packet(packet)
             except Exception as e:
@@ -252,6 +278,7 @@ def select_server():
             server_ip = server
     print("Selected server is " + server_dict[server_ip] + "(%s)." % server_ip)
     return True
+
 
 if __name__ == '__main__':
     client_ip = get_ip()
