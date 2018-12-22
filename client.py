@@ -4,7 +4,7 @@ import pygame
 from pygame.locals import VIDEORESIZE
 from threading import Thread
 from time import sleep
-
+import time
 INITIAL_WIDTH = 720
 INITIAL_HEIGHT = 480
 IMG_TRANSFER_PORT = 7344
@@ -62,7 +62,7 @@ def process_packet(packet):
     if frame_number in frames:
         is_all_chunks_received = frames[frame_number].add_chunk(chunk_number, chunk)
         if is_all_chunks_received:
-            display_frame(frame_number)
+            Thread(target=display_frame, daemon=True, args=(frame_number,)).start()
     else:
         new_frame = Frame(chunk_number_in_frame)
         new_frame.add_chunk(chunk_number, chunk)
@@ -70,6 +70,7 @@ def process_packet(packet):
 
 
 def display_frame(frame_number):
+
     global frames
     global screen_dimensions
     global clock
@@ -81,11 +82,15 @@ def display_frame(frame_number):
     # Create the Surface from raw pixels
     img = pygame.image.fromstring(pixels, screen_dimensions, 'RGB')
     img = pygame.transform.scale(img, current_window_size)
+
     # Display the picture
+
     display_window.blit(img, (0, 0))
     pygame.display.flip()
-    clock.tick(10)
+    start = time.time()
+    clock.tick(5)
 
+    print(time.time() - start)
     # Remove frame
     frames.pop(frame_number, None)
 
@@ -135,9 +140,6 @@ def start_image_listener():
                         else:
                             is_full_screen = False
                             display_window = pygame.display.set_mode(current_window_size, pygame.RESIZABLE)
-                        # modes = pygame.display.list_modes(32)
-                        # print(modes)
-                        # display_window = pygame.display.set_mode(modes[0], pygame.FULLSCREEN, 32)
                 try:
                     packet = s.recv(PACKET_SIZE)
                 except socket.timeout:
@@ -145,7 +147,6 @@ def start_image_listener():
                     print("Exiting...")
                     return
                 process_packet(packet)
-                # Thread(target=process_packet, daemon=True, args=(packet,)).start() #Shall be tested later
             except Exception as e:
                 print("Error during image receiving:")
                 print(e)

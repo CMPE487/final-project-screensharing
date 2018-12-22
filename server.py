@@ -18,7 +18,7 @@ streaming_thread = None
 clients = []
 server_name = ""
 server_key = ""
-generate_send_mutex = Lock()
+generate_send_mutex = None
 frame = None
 
 
@@ -74,6 +74,7 @@ def retrieve_screenshot():
     global generate_send_mutex
     global screen_dimensions
     global screen_dimensions_info
+    generate_send_mutex = Lock()
     generate_send_mutex.acquire()
     send_stream_packets_thread = Thread(target=send_stream_packets, daemon=True)
     send_stream_packets_thread.start()
@@ -94,6 +95,11 @@ def retrieve_screenshot():
                 print(e)  # already released
             print(time.time() - start)
     send_stream_packets_thread.is_running = False
+    try:
+        generate_send_mutex.release()
+    except Exception as e:
+        print(e)  # already released
+
 
 def respond_to_discovery_message(client_ip):
     global server_name
