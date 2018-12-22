@@ -1,6 +1,6 @@
 import socket
 from PIL import Image
-from threading import Thread, currentThread
+from threading import Thread, currentThread, Lock
 from zlib import compress
 from mss import mss
 import time
@@ -18,6 +18,8 @@ streaming_thread = None
 clients = []
 server_name = ""
 server_key = ""
+generate_send_mutex = Lock()
+frame = None
 
 
 def get_ip():
@@ -37,16 +39,47 @@ def get_ip():
     return ip
 
 
+def send_stream_packets():
+    global generate_send_mutex
+    global frame
+    frame_number = 0
+    socket_for_stream_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    socket_for_stream_send.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    t = currentThread()
+    while getattr(t, "is_running", True):
+        generate_send_mutex.acquire()
+        frame_size = len(frame)
+        print(frame_size / 1024.0)
+        if CHUNK_SIZE < frame_size:
+            chunks = [frame[i:i + CHUNK_SIZE] for i in range(0, frame_size, CHUNK_SIZE)]
+        else:
+            chunks = [frame]
+        chunk_number_in_frame = len(chunks)
+        # print("%d,%d" %(frame_number,chunk_number_in_frame))
+        for i in range(chunk_number_in_frame):
+            # Frame.number;chunk_number_in_frame;chunk_number
+            meta_data = bytes("%d;%d;%d;" % (frame_number, chunk_number_in_frame, i), "utf-8")
+            padding_size = METADATA_SIZE - len(meta_data)
+            padding = padding_size * bytes("\0", "utf-8")
+            packet = meta_data + padding + chunks[i]
+            for client_ip in clients:
+                socket_for_stream_send.sendto(packet, (client_ip, IMG_TRANSFER_PORT))
+        # time.sleep(0.03) #for the purpose of 30 fps
+        frame_number += 1
+    socket_for_stream_send.close()
+
+
 def retrieve_screenshot():
-    socket_for_image_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    socket_for_image_send.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    global frame
+    global generate_send_mutex
     global screen_dimensions
     global screen_dimensions_info
-    frame_number = 0
+    generate_send_mutex.acquire()
+    send_stream_packets_thread = Thread(target=send_stream_packets, daemon=True)
+    send_stream_packets_thread.start()
     t = currentThread()
     rect = {'top': 0, 'left': 0, 'width': screen_dimensions[0], 'height': screen_dimensions[1]}
     with mss() as sct:
-        # print(sct.monitors)
         while getattr(t, "is_running", True):
             # Capture the screen
             start = time.time()
@@ -55,26 +88,12 @@ def retrieve_screenshot():
             img = pil_img.resize(screen_dimensions_info, Image.ANTIALIAS)
             # Tweak the compression level here (0-9)
             frame = compress(img.tobytes(), 9)
-            frame_size = len(frame)
-            print(frame_size / 1024.0)
-            if CHUNK_SIZE < frame_size:
-                chunks = [frame[i:i + CHUNK_SIZE] for i in range(0, frame_size, CHUNK_SIZE)]
-            else:
-                chunks = [frame]
-            chunk_number_in_frame = len(chunks)
-            # print("%d,%d" %(frame_number,chunk_number_in_frame))
-            for i in range(chunk_number_in_frame):
-                # Frame.number;chunk_number_in_frame;chunk_number
-                meta_data = bytes("%d;%d;%d;" % (frame_number, chunk_number_in_frame, i), "utf-8")
-                padding_size = METADATA_SIZE - len(meta_data)
-                padding = padding_size * bytes("\0", "utf-8")
-                packet = meta_data + padding + chunks[i]
-                for client_ip in clients:
-                    socket_for_image_send.sendto(packet, (client_ip, IMG_TRANSFER_PORT))
+            try:
+                generate_send_mutex.release()
+            except Exception as e:
+                print(e)  # already released
             print(time.time() - start)
-            # time.sleep(0.03) #for the purpose of 30 fps
-            frame_number += 1
-
+    send_stream_packets_thread.is_running = False
 
 def respond_to_discovery_message(client_ip):
     global server_name
