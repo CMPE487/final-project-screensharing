@@ -49,13 +49,12 @@ def send_stream_packets():
     while getattr(t, "is_running", True):
         generate_send_mutex.acquire()
         frame_size = len(frame)
-        print(frame_size / 1024.0)
+        #print(frame_size / 1024.0)
         if CHUNK_SIZE < frame_size:
             chunks = [frame[i:i + CHUNK_SIZE] for i in range(0, frame_size, CHUNK_SIZE)]
         else:
             chunks = [frame]
         chunk_number_in_frame = len(chunks)
-        # print("%d,%d" %(frame_number,chunk_number_in_frame))
         for i in range(chunk_number_in_frame):
             # Frame.number;chunk_number_in_frame;chunk_number
             meta_data = bytes("%d;%d;%d;" % (frame_number, chunk_number_in_frame, i), "utf-8")
@@ -83,17 +82,20 @@ def retrieve_screenshot():
     with mss() as sct:
         while getattr(t, "is_running", True):
             # Capture the screen
-            start = time.time()
-            img = sct.grab(rect)
-            pil_img = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
-            img = pil_img.resize(screen_dimensions_info, Image.ANTIALIAS)
-            # Tweak the compression level here (0-9)
-            frame = compress(img.tobytes(), 9)
+            #start = time.time()
+            try:
+                img = sct.grab(rect)
+                pil_img = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
+                img = pil_img.resize(screen_dimensions_info, Image.ANTIALIAS)
+                # Tweak the compression level here (0-9)
+                frame = compress(img.tobytes(), 9)
+            except Exception as e:
+                print(e)
             try:
                 generate_send_mutex.release()
             except Exception as e:
                 print(e)  # already released
-            print(time.time() - start)
+            #print(time.time() - start)
     send_stream_packets_thread.is_running = False
     try:
         generate_send_mutex.release()
@@ -107,13 +109,11 @@ def respond_to_discovery_message(client_ip):
     # Discovery response protocol ->  1;server_ip;server_name
     response_message = ";".join(["1", server_ip, server_name])
 
-    # print("Discovery response message " +responseMessage)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(2)
         s.connect((client_ip, DISCOVERY_BROADCAST_PORT))
         s.sendall(str.encode(response_message))
         s.close()
-        # print("Discovery response message " + response_message + " complete")
 
 
 def start_discovery_broadcast_listener():
@@ -131,7 +131,6 @@ def start_discovery_broadcast_listener():
                     # Discovery protocol ->  0;client_ip
                     message_parsed = message.split(";", 3)
                     if message_parsed[0] == '0':
-                        # print(message_parsed)
                         client_ip = message_parsed[1]
                         respond_to_discovery_message(client_ip)
                 except Exception as e:

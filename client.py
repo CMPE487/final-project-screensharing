@@ -1,10 +1,12 @@
 import socket
 from zlib import decompress
-import pygame
+import contextlib
+
+with contextlib.redirect_stdout(None):
+    import pygame
 from pygame.locals import VIDEORESIZE
 from threading import Thread, currentThread, Lock
 from time import sleep
-import time
 
 INITIAL_WIDTH = 720
 INITIAL_HEIGHT = 480
@@ -22,7 +24,7 @@ clock = None
 frames = {}
 displayed_frame_number = -1
 client_ip = ''
-server_ip = '192.168.1.112'
+server_ip = ''
 is_full_screen = False
 server_dict = {}
 frame_number_received = None
@@ -91,7 +93,6 @@ def display_frame():
             frame_to_be_displayed = frame_number_received
             frame = frames[frame_to_be_displayed]
             frame_data = frame.get_data()
-            # print(len(frame_data))
             pixels = decompress(frame_data)
 
             # Create the Surface from raw pixels
@@ -99,15 +100,17 @@ def display_frame():
             img = pygame.transform.scale(img, current_window_size)
 
             # Display the picture
-
             display_window.blit(img, (0, 0))
             pygame.display.flip()
             # start = time.time()
             clock.tick(12)
 
             # print(time.time() - start)
-            # Remove frame
-            frames.pop(frame_to_be_displayed, None)
+            # Remove previous frames
+            previous_frames = [x for x in frames.keys() if x < frame_to_be_displayed]
+            print(previous_frames)
+            for frame in previous_frames:
+                frames.pop(frame, None)
         except Exception as e:
             print(e)
 
@@ -198,7 +201,6 @@ def get_ip():
 def send_discovery_message():
     global client_ip
     message = '0;{}'.format(client_ip)
-    # print(message)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.bind((client_ip, 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -208,10 +210,8 @@ def send_discovery_message():
 
 def get_discovery_message(accepted_socket):
     message = accepted_socket.recv(1024).decode()
-    # print(message)
     accepted_socket.close()
     message_parsed = message.split(";", 2)
-    # print(messageParsed)
     if message_parsed[0] == '1':
         discovered_server_ip = message_parsed[1]
         discovered_server_name = message_parsed[2]
