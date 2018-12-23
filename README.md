@@ -1,4 +1,4 @@
-# CmpE 487 Final Project: Screen Sharing in LAN
+# Screen Sharing - CmpE 487 Final Project
 By **[Enes Koşar](https://github.com/eneskosr)** and **[Onur Kalınağaç](https://github.com/Onurklngc)**.
 
 Python 3.6 applications developed to share your screen with multi clients on LAN and provide clients to manage your screen with mouse clicks.
