@@ -1,24 +1,18 @@
-# cmpe487-final-project
-CMPE487 Screen-Sharing Within The Network
-Enes Koşar, Onur Kalınağaç
+# CmpE 487 Final Project: Screen Sharing in LAN
+by **[Enes Koşar](https://github.com/eneskosr)** and **[Onur Kalınağaç](https://github.com/Onurklngc)**
 
-## Project Plan
+# Setup
+`pip3 install -r requirements.txt`
 
-### 26.11.2018 - 02.12.2018: Basic Stream Transfer Implementation
-- Sample image and video sending through LAN using UDP packets.
-- Testing the throughput of two computers in the same LAN.
-### 03.12.2018 - 09.12.2018: Stream Generation Implementation
-- Getting the screenshot and compressing it using zlib.
-- Sending continuous compressed screenshot to client computer.
+# Usage
 
-### 10.12.2018 - 16.12.2018: Codec Implementation
-- H.264 Implementation
-- Different Codec Trials
+For **Client** application,
 
-### 17.12.2018 - 20.12.2018: Testing and Optimization
-- (Optional) Adaptive Streaming
-- (Optional) Multiuser Support
+`python3.6 client.py`
 
-### 21.12.2018 - 23.12.2018: Presentation Preparations
+For **Server** application,
 
-### 24.12.2018: Presentation Day
+`python3.6 server.py`
+
+# Platform
+**Python 3.6** on **Ubuntu 16.04**, **Windows 10**.
