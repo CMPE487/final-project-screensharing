@@ -36,7 +36,7 @@ To view a computer where the Server application runs on it, use the **Client** a
 
 `python3 client.py`
 
-* Left and right mouse clicks on the sharer screens shall be sent to server computer and they shall be executed.
+* Left and right mouse clicks on the shared screen views on the client side shall be sent to the server computer and click actions shall be executed at that specific location.
 
 * _F5_ button refreshes screen and _F11_ button toogles the Fullscreen Mode.
 
