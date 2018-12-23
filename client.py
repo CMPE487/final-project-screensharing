@@ -10,9 +10,12 @@ from time import sleep
 
 INITIAL_WIDTH = 720
 INITIAL_HEIGHT = 480
+
 IMG_TRANSFER_PORT = 7344
 SCREEN_SHARING_REQUEST_PORT = 7345
 DISCOVERY_BROADCAST_PORT = 7346
+MOUSE_CLICK_SEND_PORT = 7347
+
 PACKET_SIZE = 1500
 CHUNK_SIZE = 1450
 METADATA_SIZE = PACKET_SIZE - CHUNK_SIZE
@@ -127,6 +130,16 @@ def send_stop_request():
             print(e)
 
 
+def send_click_message(location):
+    global server_ip
+    global client_ip
+    message = '1;{};{}'.format(location[0], location[1])
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.sendto(str.encode(message), (server_ip, MOUSE_CLICK_SEND_PORT))
+    return 0
+
+
 def start_image_listener():
     # Listen for UDP Image streams
     global screen_dimensions
@@ -149,7 +162,14 @@ def start_image_listener():
         while True:
             try:
                 for event in pygame.event.get():
-                    if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        if event.button == 1:  # left mouse button?
+                            click_position_on_display = pygame.mouse.get_pos()
+                            current_window_size = (display_window.get_width(), display_window.get_height())
+                            relative_position = tuple([click_position_on_display[i] / current_window_size[i]
+                                                       for i in range(2)])
+                            send_click_message(relative_position)
+                    elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                         display_frame_thread.is_running = False
                         send_stop_request()
                         return

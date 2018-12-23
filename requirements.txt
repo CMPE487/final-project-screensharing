@@ -1,3 +1,4 @@
 Pillow==5.3.0
 pygame==1.9.4
 mss==3.3.2
+PyUserInput==0.1.11

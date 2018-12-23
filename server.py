@@ -3,14 +3,17 @@ from PIL import Image
 from threading import Thread, currentThread, Lock
 from zlib import compress
 from mss import mss
+from pymouse import PyMouse
 import time
 
 IMG_TRANSFER_PORT = 7344
 SCREEN_SHARING_REQUEST_PORT = 7345
 DISCOVERY_BROADCAST_PORT = 7346
+MOUSE_CLICK_SEND_PORT = 7347
 PACKET_SIZE = 1500
 CHUNK_SIZE = 1450
 METADATA_SIZE = PACKET_SIZE - CHUNK_SIZE
+
 screen_dimensions = (0, 0)
 screen_dimensions_info = (1280, 720)
 screen_dimensions_info = (720, 480)
@@ -20,7 +23,7 @@ server_name = ""
 server_key = ""
 generate_send_mutex = None
 frame = None
-
+mouse = PyMouse()
 
 def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -49,7 +52,7 @@ def send_stream_packets():
     while getattr(t, "is_running", True):
         generate_send_mutex.acquire()
         frame_size = len(frame)
-        #print(frame_size / 1024.0)
+        # print(frame_size / 1024.0)
         if CHUNK_SIZE < frame_size:
             chunks = [frame[i:i + CHUNK_SIZE] for i in range(0, frame_size, CHUNK_SIZE)]
         else:
@@ -82,7 +85,7 @@ def retrieve_screenshot():
     with mss() as sct:
         while getattr(t, "is_running", True):
             # Capture the screen
-            #start = time.time()
+            # start = time.time()
             try:
                 img = sct.grab(rect)
                 pil_img = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
@@ -95,7 +98,7 @@ def retrieve_screenshot():
                 generate_send_mutex.release()
             except Exception as e:
                 print(e)  # already released
-            #print(time.time() - start)
+            # print(time.time() - start)
     send_stream_packets_thread.is_running = False
     try:
         generate_send_mutex.release()
@@ -135,6 +138,33 @@ def start_discovery_broadcast_listener():
                         respond_to_discovery_message(client_ip)
                 except Exception as e:
                     print("Error during broadcast message receiving:")
+                    print(e)
+
+
+def start_click_message_listener():
+    # Listens for UDP messages
+    global server_ip
+    global screen_dimensions
+    global mouse
+    while True:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(("", MOUSE_CLICK_SEND_PORT))
+            while True:
+                try:
+                    message, address = s.recvfrom(1024)
+
+                    message = message.decode()
+                    print(message)
+                    # Discovery protocol ->  0;client_ip
+                    message_parsed = message.split(";", 2)
+                    if message_parsed[0] == '1':
+                        click_location = (float(message_parsed[1]) * screen_dimensions[0],
+                                          float(message_parsed[2]) * screen_dimensions[1])
+                        print(click_location)
+                        mouse.click(int(click_location[0]), int(click_location[1]), 1)
+                except Exception as e:
+                    print("Error during click message receiving:")
                     print(e)
 
 
@@ -179,5 +209,7 @@ if __name__ == '__main__':
     server_ip = get_ip()
     server_name = input('Hello, enter the server display name: ')
     # server_key = input('Enter the server access key: ')
-    discovery_listener_thread = Thread(target=start_discovery_broadcast_listener, daemon=True).start()
+    Thread(target=start_discovery_broadcast_listener, daemon=True).start()
+    Thread(target=start_click_message_listener, daemon=True).start()
+
     start_screen_request_listener()
