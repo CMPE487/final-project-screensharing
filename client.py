@@ -1,7 +1,7 @@
 import socket
 from zlib import decompress
 import contextlib
-
+import argparse
 with contextlib.redirect_stdout(None):
     import pygame
 from pygame.locals import VIDEORESIZE
@@ -305,15 +305,20 @@ def select_server():
 
 if __name__ == '__main__':
     client_ip = get_ip()
-
-    # Discover server stage
-    Thread(target=start_discovery_response_message_listener, daemon=True).start()
-    send_discovery_message()
-
-    # Wait for responses
-    sleep(2)
-
-    select_server()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--server_ip", type=str,
+                        help="give the local ip address of the server you wish to connect manually, "
+                             "skip discovery procedure")
+    args = parser.parse_args()
+    if args.server_ip:
+        server_ip = args.server_ip
+    else:
+        # Discover server stage
+        Thread(target=start_discovery_response_message_listener, daemon=True).start()
+        send_discovery_message()
+        # Wait for responses
+        sleep(2)
+        select_server()
     imageReceiver = Thread(target=start_image_listener, daemon=True)
     imageReceiver.start()
     request_stream()
