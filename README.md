@@ -4,7 +4,7 @@ By **[Enes Koşar](https://github.com/eneskosr)** and **[Onur Kalınağaç](http
 Python 3.6 applications developed to share your screen with multi clients on LAN and provide clients to manage your screen with mouse clicks.
 
 # Platform
-**Python 3.6** on **Ubuntu 16.04**, **Windows 10**.
+**Python 3.6** on **Ubuntu 16.04** and **Windows 10**.
 
 # Dependencies
 Depending on your platform and client&server usage selection, you will need the following python modules:
@@ -27,7 +27,7 @@ To share your screen, use the **Server** application,
 
 **`python3 server.py`**
 
-* You can select the screen resolution to share by adding **-r** or **--resolution** optional parameter with one of the **360,480,720,1080** values.
+* You can select the screen resolution for sharing by adding **-r** or **--resolution** optional parameter with one of the **360,480,720,1080** values.
 
 **`python3 server.py -r 720`**
 
