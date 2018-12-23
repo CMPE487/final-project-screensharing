@@ -130,10 +130,11 @@ def send_stop_request():
             print(e)
 
 
-def send_click_message(location):
+def send_click_message(click_type, location):
     global server_ip
     global client_ip
-    message = '1;{};{}'.format(location[0], location[1])
+    click_type = 2 if click_type == 3 else 1
+    message = '{};{};{}'.format(click_type, location[0], location[1])
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.sendto(str.encode(message), (server_ip, MOUSE_CLICK_SEND_PORT))
@@ -163,12 +164,12 @@ def start_image_listener():
             try:
                 for event in pygame.event.get():
                     if event.type == pygame.MOUSEBUTTONDOWN:
-                        if event.button == 1:  # left mouse button?
+                        if event.button == 1 or event.button == 3:  # left(1) or right(3) mouse button
                             click_position_on_display = pygame.mouse.get_pos()
                             current_window_size = (display_window.get_width(), display_window.get_height())
                             relative_position = tuple([click_position_on_display[i] / current_window_size[i]
                                                        for i in range(2)])
-                            send_click_message(relative_position)
+                            send_click_message(event.button, relative_position)
                     elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                         display_frame_thread.is_running = False
                         send_stop_request()
@@ -185,8 +186,10 @@ def start_image_listener():
                             display_window = pygame.display.set_mode((0, 0),
                                                                      pygame.FULLSCREEN | pygame.DOUBLEBUF |
                                                                      pygame.HWSURFACE)
+                            current_window_size = (display_window.get_width(), display_window.get_height())
                         else:
                             is_full_screen = False
+                            current_window_size = screen_dimensions
                             display_window = pygame.display.set_mode(current_window_size, pygame.RESIZABLE)
                 try:
                     packet = s.recv(PACKET_SIZE)

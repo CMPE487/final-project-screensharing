@@ -5,6 +5,7 @@ from zlib import compress
 from mss import mss
 from pymouse import PyMouse
 import time
+import argparse
 
 IMG_TRANSFER_PORT = 7344
 SCREEN_SHARING_REQUEST_PORT = 7345
@@ -15,7 +16,6 @@ CHUNK_SIZE = 1450
 METADATA_SIZE = PACKET_SIZE - CHUNK_SIZE
 
 screen_dimensions = (0, 0)
-screen_dimensions_info = (1280, 720)
 screen_dimensions_info = (720, 480)
 streaming_thread = None
 clients = []
@@ -24,6 +24,7 @@ server_key = ""
 generate_send_mutex = None
 frame = None
 mouse = PyMouse()
+
 
 def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -158,11 +159,11 @@ def start_click_message_listener():
                     print(message)
                     # Discovery protocol ->  0;client_ip
                     message_parsed = message.split(";", 2)
-                    if message_parsed[0] == '1':
+                    if message_parsed[0] in ['1', '2']:
                         click_location = (float(message_parsed[1]) * screen_dimensions[0],
                                           float(message_parsed[2]) * screen_dimensions[1])
                         print(click_location)
-                        mouse.click(int(click_location[0]), int(click_location[1]), 1)
+                        mouse.click(int(click_location[0]), int(click_location[1]), int(message_parsed[0]))
                 except Exception as e:
                     print("Error during click message receiving:")
                     print(e)
@@ -206,6 +207,20 @@ def start_screen_request_listener():
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-r", "--resolution", type=int, choices=[360, 480, 720, 1080],
+                        help="decide on the stream resolution")
+    args = parser.parse_args()
+    if args.resolution == 360:
+        screen_dimensions_info = (480, 360)
+    elif args.resolution == 480:
+        screen_dimensions_info = (720, 480)
+    elif args.resolution == 720:
+        screen_dimensions_info = (1280, 720)
+    elif args.resolution == 1080:
+        screen_dimensions_info = (1920, 1080)
+    print("Resolution is %s" % str(screen_dimensions_info))
+
     server_ip = get_ip()
     server_name = input('Hello, enter the server display name: ')
     # server_key = input('Enter the server access key: ')
